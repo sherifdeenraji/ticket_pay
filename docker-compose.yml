@@ -5,12 +5,14 @@ services:
     image: postgis/postgis:15-3.3
     container_name: ticketpay-postgres
     restart: always
+    # Bind strictly to localhost (127.0.0.1) so the database is NOT exposed to the public internet
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
-      POSTGRES_USER: ticketpay_user
-      POSTGRES_PASSWORD: ticketpay_password
-      POSTGRES_DB: ticketpay
+      POSTGRES_USER: ${DB_USER:-ticketpay_user}
+      # Read the password from host environment variables to avoid hardcoded credentials in git
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ticketpay_password}
+      POSTGRES_DB: ${DB_NAME:-ticketpay}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -19,8 +21,9 @@ services:
     image: redis:7-alpine
     container_name: ticketpay-redis
     restart: always
+    # Bind strictly to localhost (127.0.0.1) so Redis is NOT exposed to the public internet
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
 

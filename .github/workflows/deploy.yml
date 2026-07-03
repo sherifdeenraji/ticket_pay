@@ -1,0 +1,98 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  # --- CI GATE: Build & Test ---
+  build:
+    name: Build Verification Gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+            admin/package-lock.json
+
+      # Build and Verify Backend
+      - name: Verify Backend Builds
+        run: |
+          cd backend
+          npm ci
+          npm run build
+
+      # Build and Verify Student Frontend
+      - name: Verify Student Frontend Builds
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      # Build and Verify Admin Dashboard
+      - name: Verify Admin Dashboard Builds
+        run: |
+          cd admin
+          npm ci
+          npm run build
+
+  # --- CD GATE: Deploy to VPS ---
+  deploy:
+    name: Deploy to AWS VPS
+    runs-on: ubuntu-latest
+    needs: build  # Ensures deployment only runs if all builds successfully compile!
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            # 1. Navigate to your project folder on the VPS
+            cd ~/ticketpay || exit 1
+
+            # 2. Pull the latest code from GitHub
+            git pull origin main
+
+            # 3. Start/update Docker services (Postgres & Redis)
+            # Ensure host environment variables (DB_USER, DB_PASSWORD, DB_NAME) are loaded or fallback to default
+            docker compose up -d
+
+            # 4. Deploy Backend (Express)
+            echo "Deploying Backend..."
+            cd backend
+            npm install --production
+            npm run build
+            pm2 restart ticketpay-backend || pm2 start dist/app.js --name ticketpay-backend
+            
+            # 5. Deploy Student Frontend (Next.js)
+            echo "Deploying Student Frontend..."
+            cd ../frontend
+            npm install --production
+            npm run build
+            pm2 restart ticketpay-frontend || pm2 start npm --name ticketpay-frontend -- run start -- --port 3000
+
+            # 6. Deploy Admin Frontend (Next.js)
+            echo "Deploying Admin Frontend..."
+            cd ../admin
+            npm install --production
+            npm run build
+            pm2 restart ticketpay-admin || pm2 start npm --name ticketpay-admin -- run start -- --port 3001
+            
+            echo "Deployment finished successfully!"
