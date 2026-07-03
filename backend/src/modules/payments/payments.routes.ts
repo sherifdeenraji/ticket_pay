@@ -17,5 +17,6 @@ const ridePaymentSchema = z.object({
 
 router.post('/pay', protect, validate(ridePaymentSchema), paymentsController.payForRide);
 router.get('/history', protect, paymentsController.getRideHistory);
+router.post('/:id/dispute', protect, paymentsController.disputePayment);
 
 export default router;

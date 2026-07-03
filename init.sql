@@ -40,11 +40,15 @@ CREATE TABLE IF NOT EXISTS admins (
 CREATE TABLE IF NOT EXISTS drivers (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
+    phone_number VARCHAR(50) NOT NULL,
     driver_code VARCHAR(50) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
     qr_code TEXT,
     route VARCHAR(255),
+    vehicle_type VARCHAR(20) CHECK (vehicle_type IN ('bus', 'keke')),
     vehicle_number VARCHAR(50) NOT NULL,
-    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+    photo_url VARCHAR(255),
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'deactivated')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -89,4 +93,17 @@ CREATE TABLE IF NOT EXISTS notifications (
     message TEXT NOT NULL,
     read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Disputes table
+CREATE TABLE IF NOT EXISTS disputes (
+    id SERIAL PRIMARY KEY,
+    ride_payment_id INTEGER NOT NULL REFERENCES ride_payments(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    driver_id INTEGER NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
+    amount NUMERIC(12, 2) NOT NULL,
+    reason TEXT,
+    status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'approved', 'rejected')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP
 );
