@@ -1,0 +1,15 @@
+.env
+guide.txt
+webhook_payload_example.json
+node_modules/
+dist/
+logs/
+coverage/
+*.log
+*.tmp
+*.bak
+.DS_Store
+.idea/
+.vscode/
+migrations/
+studentride-key.pem
