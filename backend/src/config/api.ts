@@ -28,10 +28,11 @@ export const getNombaAccessToken = async (): Promise<string> => {
 
   const tokenData = response.data?.data;
   if (!tokenData?.access_token) {
+    // send an email to the admin to check as this is a critical failure
     throw new Error(`Failed to obtain Nomba access token: ${JSON.stringify(response.data)}`);
   }
 
-  cachedToken = tokenData.access_token;
+  cachedToken = tokenData.access_token as string;
   // expires_in is in seconds, convert to millisecond timestamp
   const expiresLimit = tokenData.expires_in || 86400;
   tokenExpiryTime = now + expiresLimit * 1000;
