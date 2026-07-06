@@ -60,7 +60,7 @@ export const createNewVirtualAccount = async (
   const accountRef = `REF-${timestamp}-${randomPart}`;
 
   const response = await axios.post(
-    `${config.NOMBA.BASE_URL}/v1/accounts/virtual`,
+    `${config.NOMBA.BASE_URL}/v1/accounts/virtual/${config.NOMBA.SUB_ACCOUNT_ID}`,
     {
       accountRef,
       accountName: `${firstName} ${lastName}`,

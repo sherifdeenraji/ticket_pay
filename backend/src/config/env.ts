@@ -1,47 +1,136 @@
 import dotenv from 'dotenv';
+import { z } from 'zod';
 
 dotenv.config();
 
+// ---------------------------------------------------------------------------
+// Schema — required fields have no default and will fail if unset
+// ---------------------------------------------------------------------------
+const envSchema = z.object({
+    // Server
+    PORT: z.coerce.number().default(5000),
+    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+
+    // Database
+    DB_USER: z.string().min(1),
+    DB_PASSWORD: z.string().min(1),
+    DB_HOST: z.string().default('localhost'),
+    DB_PORT: z.coerce.number().default(5432),
+    DB_NAME: z.string().default('ticketpay'),
+
+    // JWT
+    JWT_SECRET: z.string().min(1),
+    ADMIN_JWT_SECRET: z.string().min(1),
+    JWT_EXPIRES_IN: z.string().default('1d'),
+
+    // Admin credentials
+    ADMIN_USERNAME: z.string().default('admin'),
+    ADMIN_PASSWORD: z.string().default('adminpassword'),
+
+    // Google OAuth
+    GOOGLE_CLIENT_ID: z.string().min(1),
+    GOOGLE_CLIENT_SECRET: z.string().min(1),
+    GOOGLE_CALLBACK_URL: z.string().url(),
+
+    // Mail
+    MAIL_HOST: z.string().min(1),
+    MAIL_PORT: z.coerce.number().default(587),
+    MAIL_USER: z.string().min(1),
+    MAIL_PASS: z.string().min(1),
+    MAIL_FROM: z.string().min(1),
+
+    // Nomba payment
+    NOMBA_CLIENT_ID: z.string().min(1),
+    NOMBA_CLIENT_SECRET: z.string().min(1),
+    NOMBA_ACCOUNT_ID: z.string().min(1),
+    NOMBA_SUB_ACCOUNT_ID: z.string().min(1),
+    NOMBA_WEBHOOK_SECRET: z.string().min(1),
+    NOMBA_BASE_URL: z.string().url().default('https://api.nomba.com'),
+
+    // Frontend URLs
+    STUDENT_FRONTEND_URL: z.string().url().default('http://localhost:3000'),
+    ADMIN_FRONTEND_URL: z.string().url().default('http://localhost:3001'),
+});
+
+// ---------------------------------------------------------------------------
+// Parse & validate — exit immediately on failure with a clear error report
+// ---------------------------------------------------------------------------
+const parsed = envSchema.safeParse(process.env);
+
+if (!parsed.success) {
+    const issues = parsed.error.issues;
+
+    console.error('\n❌  Environment validation failed — server cannot start.\n');
+    console.error('The following environment variables are missing or invalid:\n');
+
+    // Build a nice table
+    const rows = issues.map((issue) => ({
+        variable: issue.path.join('.'),
+        problem: issue.message,
+    }));
+
+    const maxVar = Math.max(...rows.map((r) => r.variable.length), 'VARIABLE'.length);
+    const maxMsg = Math.max(...rows.map((r) => r.problem.length), 'PROBLEM'.length);
+
+    const line = `  ${'─'.repeat(maxVar + 2)}┼${'─'.repeat(maxMsg + 2)}`;
+    const header = `  ${'VARIABLE'.padEnd(maxVar)}  │  ${'PROBLEM'.padEnd(maxMsg)}`;
+
+    console.error(header);
+    console.error(line);
+    rows.forEach(({ variable, problem }) => {
+        console.error(`  ${variable.padEnd(maxVar)}  │  ${problem}`);
+    });
+
+    console.error('\nPlease set the missing values in your .env file and restart.\n');
+    process.exit(1);
+}
+
+const env = parsed.data;
+
+// ---------------------------------------------------------------------------
+// Export structured config (same shape as before)
+// ---------------------------------------------------------------------------
 export const config = {
-    PORT: process.env.PORT || 5000,
-    NODE_ENV: process.env.NODE_ENV || 'development',
+    PORT: env.PORT,
+    NODE_ENV: env.NODE_ENV,
     DB: {
-        USER: process.env.DB_USER,
-        PASSWORD: process.env.DB_PASSWORD,
-        HOST: process.env.DB_HOST || 'localhost',
-        PORT: parseInt(process.env.DB_PORT || '5432'),
-        NAME: process.env.DB_NAME || 'ticketpay',
+        USER: env.DB_USER,
+        PASSWORD: env.DB_PASSWORD,
+        HOST: env.DB_HOST,
+        PORT: env.DB_PORT,
+        NAME: env.DB_NAME,
     },
     JWT: {
-        USER_SECRET: process.env.JWT_SECRET || 'user-fallback-secret',
-        ADMIN_SECRET: process.env.ADMIN_JWT_SECRET || 'admin-fallback-secret',
-        EXPIRES_IN: process.env.JWT_EXPIRES_IN || '1d',
+        USER_SECRET: env.JWT_SECRET,
+        ADMIN_SECRET: env.ADMIN_JWT_SECRET,
+        EXPIRES_IN: env.JWT_EXPIRES_IN,
     },
     ADMIN: {
-        USERNAME: process.env.ADMIN_USERNAME || 'admin',
-        PASSWORD: process.env.ADMIN_PASSWORD || 'adminpassword',
+        USERNAME: env.ADMIN_USERNAME,
+        PASSWORD: env.ADMIN_PASSWORD,
     },
     GOOGLE: {
-        CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
-        CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
-        CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL,
+        CLIENT_ID: env.GOOGLE_CLIENT_ID,
+        CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET,
+        CALLBACK_URL: env.GOOGLE_CALLBACK_URL,
     },
     MAILTRAP: {
-        HOST: process.env.MAIL_HOST,
-        PORT: parseInt(process.env.MAIL_PORT || '587'),
-        USER: process.env.MAIL_USER,
-        PASS: process.env.MAIL_PASS,
-        FROM: process.env.MAIL_FROM,
+        HOST: env.MAIL_HOST,
+        PORT: env.MAIL_PORT,
+        USER: env.MAIL_USER,
+        PASS: env.MAIL_PASS,
+        FROM: env.MAIL_FROM,
     },
     NOMBA: {
-        CLIENT_ID: process.env.NOMBA_CLIENT_ID,
-        CLIENT_SECRET: process.env.NOMBA_CLIENT_SECRET,
-        ACCOUNT_ID: process.env.NOMBA_ACCOUNT_ID,
-        WEBHOOK_SECRET: process.env.NOMBA_WEBHOOK_SECRET,
-        BASE_URL: process.env.NOMBA_BASE_URL || 'https://api.nomba.com',
+        CLIENT_ID: env.NOMBA_CLIENT_ID,
+        CLIENT_SECRET: env.NOMBA_CLIENT_SECRET,
+        ACCOUNT_ID: env.NOMBA_ACCOUNT_ID,
+        SUB_ACCOUNT_ID: env.NOMBA_SUB_ACCOUNT_ID,
+        WEBHOOK_SECRET: env.NOMBA_WEBHOOK_SECRET,
+        BASE_URL: env.NOMBA_BASE_URL,
     },
     FRONTEND: {
-        STUDENT: process.env.STUDENT_FRONTEND_URL || 'http://localhost:3000',
-        ADMIN: process.env.ADMIN_FRONTEND_URL || 'http://localhost:3001',
+        STUDENT: env.STUDENT_FRONTEND_URL,
+        ADMIN: env.ADMIN_FRONTEND_URL,
     },
 };
