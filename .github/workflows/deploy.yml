@@ -93,6 +93,8 @@ jobs:
           # Layer caching — dramatically speeds up repeat builds
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api.ticketpay.com.ng/api
 
   # ────────────────────────────────────────────────────────────────────────────
   # DEPLOY: SSH into VPS, pull new images, rolling restart (zero downtime)

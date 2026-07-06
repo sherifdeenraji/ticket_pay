@@ -16,6 +16,9 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 # Ensure public/ exists even if the project has no public assets
 RUN mkdir -p public
 
