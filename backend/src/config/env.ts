@@ -32,12 +32,14 @@ const envSchema = z.object({
     GOOGLE_CLIENT_SECRET: z.string().min(1),
     GOOGLE_CALLBACK_URL: z.string().url(),
 
-    // Mail
-    MAIL_HOST: z.string().min(1),
-    MAIL_PORT: z.coerce.number().default(587),
-    MAIL_USER: z.string().min(1),
-    MAIL_PASS: z.string().min(1),
-    MAIL_FROM: z.string().min(1),
+    // Mail — Mailtrap Transactional API (primary)
+    MAILTRAP_TOKEN: z.string().min(1),
+    MAIL_FROM: z.string().email(),
+    MAIL_FROM_NAME: z.string().default('TicketPay'),
+
+    // Mail — Resend (fallback, optional but recommended)
+    RESEND_API_KEY: z.string().optional(),
+    RESEND_FROM: z.string().optional(),
 
     // Nomba payment
     NOMBA_CLIENT_ID: z.string().min(1),
@@ -115,11 +117,13 @@ export const config = {
         CALLBACK_URL: env.GOOGLE_CALLBACK_URL,
     },
     MAILTRAP: {
-        HOST: env.MAIL_HOST,
-        PORT: env.MAIL_PORT,
-        USER: env.MAIL_USER,
-        PASS: env.MAIL_PASS,
+        TOKEN: env.MAILTRAP_TOKEN,
         FROM: env.MAIL_FROM,
+        FROM_NAME: env.MAIL_FROM_NAME,
+    },
+    RESEND: {
+        API_KEY: env.RESEND_API_KEY,
+        FROM: env.RESEND_FROM ?? env.MAIL_FROM,
     },
     NOMBA: {
         CLIENT_ID: env.NOMBA_CLIENT_ID,
