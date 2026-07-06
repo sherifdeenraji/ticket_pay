@@ -1,31 +1,95 @@
-version: '3.8'
-
 services:
-  postgres:
+
+  # ── Reverse Proxy + SSL ─────────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: ticketpay-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      - frontend
+      - admin
+      - backend
+    restart: unless-stopped
+
+  # ── SSL Certificate Auto-Renewal ────────────────────────────────────────────
+  certbot:
+    image: certbot/certbot
+    container_name: ticketpay-certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: >
+      sh -c "trap exit TERM;
+             while :; do certbot renew --quiet; sleep 12h & wait $${!}; done"
+    restart: unless-stopped
+
+  # ── Backend API ─────────────────────────────────────────────────────────────
+  backend:
+    image: ghcr.io/${GITHUB_REPOSITORY}/backend:${IMAGE_TAG:-latest}
+    container_name: ticketpay-backend
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    # Not exposed to host — only reachable via nginx on internal network
+
+  # ── Student Frontend ─────────────────────────────────────────────────────────
+  frontend:
+    image: ghcr.io/${GITHUB_REPOSITORY}/frontend:${IMAGE_TAG:-latest}
+    container_name: ticketpay-frontend
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    restart: unless-stopped
+
+  # ── Admin Dashboard ──────────────────────────────────────────────────────────
+  admin:
+    image: ghcr.io/${GITHUB_REPOSITORY}/admin:${IMAGE_TAG:-latest}
+    container_name: ticketpay-admin
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    restart: unless-stopped
+
+  # ── PostgreSQL ───────────────────────────────────────────────────────────────
+  db:
     image: postgis/postgis:15-3.3
     container_name: ticketpay-postgres
-    restart: always
-    # Bind strictly to localhost (127.0.0.1) so the database is NOT exposed to the public internet
-    ports:
-      - "127.0.0.1:5432:5432"
     environment:
-      POSTGRES_USER: ${DB_USER:-ticketpay_user}
-      # Read the password from host environment variables to avoid hardcoded credentials in git
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-ticketpay_password}
-      POSTGRES_DB: ${DB_NAME:-ticketpay}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    # NO ports — not accessible from outside the Docker network
 
+  # ── Redis ────────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: ticketpay-redis
-    restart: always
-    # Bind strictly to localhost (127.0.0.1) so Redis is NOT exposed to the public internet
-    ports:
-      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    # NO ports — not accessible from outside the Docker network
 
 volumes:
   postgres_data:

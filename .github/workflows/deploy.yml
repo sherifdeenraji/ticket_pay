@@ -2,61 +2,123 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  # e.g. ghcr.io/yourusername/ticketpay
+  IMAGE_BASE: ghcr.io/${{ github.repository_owner }}/ticketpay
 
 jobs:
-  # --- CI GATE: Build & Test ---
-  build:
-    name: Build Verification Gate
+  # ────────────────────────────────────────────────────────────────────────────
+  # CI GATE: Build & verify all three services in parallel
+  # ────────────────────────────────────────────────────────────────────────────
+  ci:
+    name: Build & Verify (${{ matrix.service }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true        # cancel all jobs if any service fails to build
+      matrix:
+        service: [backend, frontend, admin]
 
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-          cache-dependency-path: |
-            backend/package-lock.json
-            frontend/package-lock.json
-            admin/package-lock.json
+          cache: npm
+          cache-dependency-path: ${{ matrix.service }}/package-lock.json
 
-      # Build and Verify Backend
-      - name: Verify Backend Builds
-        run: |
-          cd backend
-          npm ci
-          npm run build
+      - name: Install dependencies
+        working-directory: ${{ matrix.service }}
+        run: npm ci
 
-      # Build and Verify Student Frontend
-      - name: Verify Student Frontend Builds
-        run: |
-          cd frontend
-          npm ci
-          npm run build
+      - name: Build
+        working-directory: ${{ matrix.service }}
+        run: npm run build
+        env:
+          # Suppress Next.js telemetry during CI
+          NEXT_TELEMETRY_DISABLED: 1
+          # Provide a placeholder so env validation in backend doesn't fail at build time
+          SKIP_ENV_VALIDATION: true
 
-      # Build and Verify Admin Dashboard
-      - name: Verify Admin Dashboard Builds
-        run: |
-          cd admin
-          npm ci
-          npm run build
-
-  # --- CD GATE: Deploy to VPS ---
-  deploy:
-    name: Deploy to AWS VPS
+  # ────────────────────────────────────────────────────────────────────────────
+  # BUILD & PUSH DOCKER IMAGES to GitHub Container Registry
+  # Runs after ALL ci jobs pass, builds all images in parallel
+  # ────────────────────────────────────────────────────────────────────────────
+  docker:
+    name: Docker Build & Push (${{ matrix.service }})
     runs-on: ubuntu-latest
-    needs: build  # Ensures deployment only runs if all builds successfully compile!
+    needs: ci
+    permissions:
+      contents: read
+      packages: write      # required to push to GHCR
+
+    strategy:
+      matrix:
+        service: [backend, frontend, admin]
 
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy to VPS via SSH
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata (tags & labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_BASE }}/${{ matrix.service }}
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build & push image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Layer caching — dramatically speeds up repeat builds
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # DEPLOY: SSH into VPS, pull new images, rolling restart (zero downtime)
+  # ────────────────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: docker
+    environment: production    # optional: adds a manual approval gate in GitHub UI
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copy docker-compose & nginx config to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          source: "docker-compose.yml,nginx/,init.sql"
+          target: "~/ticketpay"
+
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -64,35 +126,27 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
           script: |
-            # 1. Navigate to your project folder on the VPS
-            cd ~/ticketpay || exit 1
+            set -e
+            cd ~/ticketpay
 
-            # 2. Pull the latest code from GitHub
-            git pull origin main
+            # ── Update image tag in the existing .env (managed by admin on VPS) ─
+            sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${{ github.sha }}|" .env
+            sed -i "s|^GITHUB_REPOSITORY=.*|GITHUB_REPOSITORY=${{ github.repository }}|" .env
 
-            # 3. Start/update Docker services (Postgres & Redis)
-            # Ensure host environment variables (DB_USER, DB_PASSWORD, DB_NAME) are loaded or fallback to default
-            docker compose up -d
+            # ── Log in to GHCR to pull private images ────────────────────────
+            echo "${{ secrets.GITHUB_TOKEN }}" | \
+              docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            # 4. Deploy Backend (Express)
-            echo "Deploying Backend..."
-            cd backend
-            npm install --production
-            npm run build
-            pm2 restart ticketpay-backend || pm2 start dist/app.js --name ticketpay-backend
-            
-            # 5. Deploy Student Frontend (Next.js)
-            echo "Deploying Student Frontend..."
-            cd ../frontend
-            npm install --production
-            npm run build
-            pm2 restart ticketpay-frontend || pm2 start npm --name ticketpay-frontend -- run start -- --port 3000
+            # ── Pull new images ───────────────────────────────────────────────
+            docker compose pull backend frontend admin
 
-            # 6. Deploy Admin Frontend (Next.js)
-            echo "Deploying Admin Frontend..."
-            cd ../admin
-            npm install --production
-            npm run build
-            pm2 restart ticketpay-admin || pm2 start npm --name ticketpay-admin -- run start -- --port 3001
-            
-            echo "Deployment finished successfully!"
+            # ── Rolling restart: one service at a time (DB/Redis untouched) ───
+            docker compose up -d --no-deps --remove-orphans backend
+            docker compose up -d --no-deps --remove-orphans frontend
+            docker compose up -d --no-deps --remove-orphans admin
+            docker compose up -d --no-deps nginx certbot
+
+            # ── Cleanup dangling images ───────────────────────────────────────
+            docker image prune -f
+
+            echo "✅ Deployment complete — $(date)"
