@@ -16,6 +16,9 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Ensure public/ exists even if the project has no public assets
+RUN mkdir -p public
+
 RUN npm run build
 
 # ── Stage 3: Production ──────────────────────────────────────────────────────
@@ -28,7 +31,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public 2>/dev/null || true
+COPY --from=builder /app/public ./public
 
 EXPOSE 3001
 

@@ -16,6 +16,9 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Ensure public/ exists even if the project has no public assets
+RUN mkdir -p public
+
 RUN npm run build
 
 # ── Stage 3: Production ──────────────────────────────────────────────────────
