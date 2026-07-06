@@ -6,8 +6,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # e.g. ghcr.io/yourusername/ticketpay
-  IMAGE_BASE: ghcr.io/${{ github.repository_owner }}/ticketpay
+  IMAGE_BASE: ghcr.io/${{ github.repository }}
 
 jobs:
   # ────────────────────────────────────────────────────────────────────────────
