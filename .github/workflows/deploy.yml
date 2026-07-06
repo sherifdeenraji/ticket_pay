@@ -130,8 +130,11 @@ jobs:
             cd ~/ticketpay
 
             # ── Update image tag in the existing .env (managed by admin on VPS) ─
-            sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${{ github.sha }}|" .env
-            sed -i "s|^GITHUB_REPOSITORY=.*|GITHUB_REPOSITORY=${{ github.repository }}|" .env
+            touch .env
+            sed -i '/^IMAGE_TAG=/d' .env
+            sed -i '/^GITHUB_REPOSITORY=/d' .env
+            echo "IMAGE_TAG=${{ github.sha }}" >> .env
+            echo "GITHUB_REPOSITORY=${{ github.repository }}" >> .env
 
             # ── Log in to GHCR to pull private images ────────────────────────
             echo "${{ secrets.GITHUB_TOKEN }}" | \
