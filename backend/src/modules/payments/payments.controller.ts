@@ -51,7 +51,7 @@ export const paymentsController = {
     disputePayment: async (req: AuthRequest, res: Response, next: NextFunction) => {
         try {
             const userId = req.user.id;
-            const paymentId = parseInt(req.params.id);
+            const paymentId = parseInt(req.params.id as string);
             const { reason } = req.body;
 
             if (!reason) {

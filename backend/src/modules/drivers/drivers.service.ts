@@ -112,5 +112,72 @@ export const driverService = {
             'UPDATE drivers SET driver_code = $1, qr_code = $2 WHERE id = $3',
             [newCode, newQR, id]
         );
-    }
+    },
+
+    getDisputes: async (driverId: number): Promise<any[]> => {
+        const result = await db.query(
+            `SELECT d.*, u.fullname as student_name, rp.ticket_count
+             FROM disputes d
+             JOIN users u ON d.user_id = u.id
+             JOIN ride_payments rp ON d.ride_payment_id = rp.id
+             WHERE d.driver_id = $1
+             ORDER BY d.created_at DESC`,
+            [driverId]
+        );
+        return result.rows;
+    },
+
+    findDisputeById: async (id: number): Promise<any | null> => {
+        const result = await db.query(
+            `SELECT d.*, u.fullname as student_name, rp.ticket_count
+             FROM disputes d
+             JOIN users u ON d.user_id = u.id
+             JOIN ride_payments rp ON d.ride_payment_id = rp.id
+             WHERE d.id = $1`,
+            [id]
+        );
+        return result.rows[0] || null;
+    },
+
+    resolveDispute: async (id: number, action: 'approved' | 'rejected'): Promise<boolean> => {
+        const client = await db.getClient();
+        try {
+            await client.query('BEGIN');
+
+            // Only resolve open disputes
+            const disputeRes = await client.query(
+                `UPDATE disputes SET status = $1, resolved_at = NOW()
+                 WHERE id = $2 AND status = 'open'
+                 RETURNING *`,
+                [action, id]
+            );
+
+            if (disputeRes.rowCount === 0) {
+                await client.query('ROLLBACK');
+                return false;
+            }
+
+            // If approved, refund the amount to the student's wallet
+            if (action === 'approved') {
+                const dispute = disputeRes.rows[0];
+                await client.query(
+                    `UPDATE wallets SET balance = balance + $1 WHERE user_id = $2`,
+                    [dispute.amount, dispute.user_id]
+                );
+                // Also mark the original ride payment as refunded
+                await client.query(
+                    `UPDATE ride_payments SET status = 'refunded' WHERE id = $1`,
+                    [dispute.ride_payment_id]
+                );
+            }
+
+            await client.query('COMMIT');
+            return true;
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        } finally {
+            client.release();
+        }
+    },
 };
