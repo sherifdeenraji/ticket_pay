@@ -73,7 +73,7 @@ export const createNewVirtualAccount = async (
       },
     }
   );
-
+ 
   const resData = response.data;
   if (resData.code !== "00" || !resData.data) {
     throw new Error(`Failed to generate Nomba virtual account: ${resData.description || JSON.stringify(resData)}`);
