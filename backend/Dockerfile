@@ -20,12 +20,8 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Copy compiled output and seed files
+# Copy compiled output
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/seeds ./seeds
-
-# tsx is needed at runtime to run the seed (TS file)
-RUN npm install -g tsx
 
 EXPOSE 5000
 
