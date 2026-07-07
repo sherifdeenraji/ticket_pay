@@ -12,6 +12,7 @@ import { requestLogger } from './middleware/requestLogger.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
 import walletRoutes from './modules/wallet/wallet.routes.js';
+import { webhookController } from './modules/wallet/webhook.controller.js';
 import driversRoutes from './modules/drivers/drivers.routes.js';
 import paymentsRoutes from './modules/payments/payments.routes.js';
 import passport from './config/passport.js';
@@ -34,6 +35,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(passport.initialize());
 
+// Trust proxy (required since we are behind Nginx proxy to identify real client IPs for rate limiting)
+app.set('trust proxy', 1);
+
 // Rate Limiting
 app.use(generalLimiter);
 
@@ -41,6 +45,7 @@ app.use(generalLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/wallet', walletRoutes);
+app.post('/api/wallets/webhook/nomba', webhookController.handleNomba); // Specific alias for Nomba webhook
 app.use('/api/drivers', driversRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/notifications', notificationsRoutes);
