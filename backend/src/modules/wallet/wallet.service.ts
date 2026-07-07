@@ -74,10 +74,10 @@ export const walletService = {
             // Update transaction status
             const updatedTxResult = await client.query(
                 `UPDATE wallet_transactions 
-                 SET status = $1, gateway_response = $2 
-                 WHERE id = $3 
+                 SET status = $1 
+                 WHERE id = $2 
                  RETURNING *`,
-                [status, gatewayResponse, transaction.id]
+                [status, transaction.id]
             );
 
             // If success, update the wallet balance
@@ -151,10 +151,10 @@ export const walletService = {
 
             // Create transaction record
             const txResult = await client.query(
-                `INSERT INTO wallet_transactions (wallet_id, amount, type, status, reference, gateway_response, description)
-                 VALUES ($1, $2, 'credit', 'success', $3, $4, $5)
+                `INSERT INTO wallet_transactions (wallet_id, amount, type, status, reference, description)
+                 VALUES ($1, $2, 'credit', 'success', $3, $4)
                  RETURNING *`,
-                [wallet.id, amount, txId, gatewayPayload, `Wallet funding via ${gatewayPayload.sender?.bank || 'bank transfer'}`]
+                [wallet.id, amount, txId, `Wallet funding via ${gatewayPayload.sender?.bank || 'bank transfer'}`]
             );
 
             // Update wallet balance
