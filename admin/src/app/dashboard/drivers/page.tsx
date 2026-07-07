@@ -23,6 +23,9 @@ export default function DriversPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [createdPassword, setCreatedPassword] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [formData, setFormData] = useState<{
     name: string;
@@ -114,9 +117,12 @@ export default function DriversPage() {
         // Create
         const res = await api.post('/admin/drivers', payload);
         if (res.data.success) {
-          alert('Driver created successfully');
+          const tempPassword = res.data.data?.temporary_password;
+          setCreatedPassword(tempPassword || 'Password was pre-set');
+          setCopied(false);
           fetchDrivers();
           setShowModal(false);
+          setShowPasswordModal(true);
         }
       }
     } catch (error: any) {
@@ -404,6 +410,52 @@ export default function DriversPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Temporary Password Modal */}
+      <Modal 
+        isOpen={showPasswordModal} 
+        onClose={() => {
+          setShowPasswordModal(false);
+          setCreatedPassword(null);
+        }} 
+        title="Driver Created Successfully"
+      >
+        <div className="flex flex-col p-4 space-y-4">
+          <p className="text-sm text-slate-600">
+            A temporary password has been generated for this driver. 
+            Please <strong className="text-slate-900">copy and save it now</strong>. For security, it will not be displayed again.
+          </p>
+
+          <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl border border-slate-200 font-mono text-base font-bold text-slate-800">
+            <span className="select-all tracking-wider">{createdPassword}</span>
+            <button
+              onClick={() => {
+                if (createdPassword) {
+                  navigator.clipboard.writeText(createdPassword);
+                  setCopied(true);
+                }
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-sans transition-all ${
+                copied ? 'bg-green-100 text-green-800' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+              }`}
+            >
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+
+          <div className="pt-2">
+            <button
+              onClick={() => {
+                setShowPasswordModal(false);
+                setCreatedPassword(null);
+              }}
+              className="w-full btn-primary h-12 text-sm font-semibold rounded-xl"
+            >
+              Close & Discard
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
