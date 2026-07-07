@@ -49,6 +49,10 @@ const envSchema = z.object({
     NOMBA_WEBHOOK_SECRET: z.string().min(1),
     NOMBA_BASE_URL: z.string().url().default('https://api.nomba.com'),
 
+    // Redis
+    REDIS_HOST: z.string().default('localhost'),
+    REDIS_PORT: z.coerce.number().default(6379),
+
     // Frontend URLs
     STUDENT_FRONTEND_URL: z.string().url().default('http://localhost:3000'),
     ADMIN_FRONTEND_URL: z.string().url().default('http://localhost:3001'),
@@ -136,5 +140,9 @@ export const config = {
     FRONTEND: {
         STUDENT: env.STUDENT_FRONTEND_URL,
         ADMIN: env.ADMIN_FRONTEND_URL,
+    },
+    REDIS: {
+        HOST: env.REDIS_HOST,
+        PORT: env.REDIS_PORT,
     },
 };

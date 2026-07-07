@@ -1,16 +1,62 @@
 import axios from "axios";
 import { config } from "./env.js";
 
-let cachedToken: string | null = null;
-let tokenExpiryTime: number = 0;
+import redis from "./redis.js";
 
 export const getNombaAccessToken = async (): Promise<string> => {
-  const now = Date.now();
-  // If we have a cached token and it hasn't expired yet (with a 60-second buffer), use it
-  if (cachedToken && tokenExpiryTime > now + 60000) {
-    return cachedToken;
+  // 1. Try to get the active cached access token (which is cached for 25 minutes)
+  const cachedAccessToken = await redis.get("nomba:access_token");
+  if (cachedAccessToken) {
+    return cachedAccessToken;
   }
 
+  // 2. If expired/missing, check if we have a refresh token and the expired access token to renew it
+  const cachedRefreshToken = await redis.get("nomba:refresh_token");
+  const expiredAccessToken = await redis.get("nomba:expired_access_token");
+
+  if (cachedRefreshToken) {
+    try {
+      console.log("Nomba access token expired. Attempting to refresh token using refresh_token...");
+      const response = await axios.post(
+        `${config.NOMBA.BASE_URL}/v1/auth/token/refresh`,
+        {
+          grant_type: "refresh_token",
+          refresh_token: cachedRefreshToken,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${expiredAccessToken || ""}`,
+            "accountId": config.NOMBA.ACCOUNT_ID,
+          },
+        }
+      );
+
+      const tokenData = response.data?.data;
+      if (tokenData?.access_token) {
+        const newAccessToken = tokenData.access_token;
+        const newRefreshToken = tokenData.refresh_token || cachedRefreshToken;
+
+        // Cache the active access token for 25 minutes (1500 seconds)
+        await redis.setex("nomba:access_token", 1500, newAccessToken);
+        // Keep the access token for up to 30 minutes (1800 seconds) to use for subsequent refresh requests
+        await redis.setex("nomba:expired_access_token", 1800, newAccessToken);
+        // Cache the refresh token (longer TTL, e.g. 30 days)
+        await redis.setex("nomba:refresh_token", 30 * 24 * 60 * 60, newRefreshToken);
+
+        console.log("Nomba access token refreshed successfully via refresh_token!");
+        return newAccessToken;
+      }
+    } catch (refreshErr: any) {
+      console.error(
+        "Failed to refresh Nomba token, falling back to complete re-issue:",
+        refreshErr.response?.data || refreshErr.message
+      );
+    }
+  }
+
+  // 3. Complete re-issue if refresh token doesn't exist or refresh fails
+  console.log("Requesting fresh Nomba token issue (grant_type: client_credentials)...");
   const response = await axios.post(
     `${config.NOMBA.BASE_URL}/v1/auth/token/issue`,
     {
@@ -28,16 +74,24 @@ export const getNombaAccessToken = async (): Promise<string> => {
 
   const tokenData = response.data?.data;
   if (!tokenData?.access_token) {
-    // send an email to the admin to check as this is a critical failure
     throw new Error(`Failed to obtain Nomba access token: ${JSON.stringify(response.data)}`);
   }
 
-  cachedToken = tokenData.access_token as string;
-  // expires_in is in seconds, convert to millisecond timestamp
-  const expiresLimit = tokenData.expires_in || 86400;
-  tokenExpiryTime = now + expiresLimit * 1000;
+  const newAccessToken = tokenData.access_token;
+  const newRefreshToken = tokenData.refresh_token;
 
-  return cachedToken;
+  // Cache access token for 25 minutes (1500 seconds)
+  await redis.setex("nomba:access_token", 1500, newAccessToken);
+  // Keep the access token for up to 30 minutes (1800 seconds) to use for subsequent refresh requests
+  await redis.setex("nomba:expired_access_token", 1800, newAccessToken);
+  
+  if (newRefreshToken) {
+    // Cache refresh token for 30 days
+    await redis.setex("nomba:refresh_token", 30 * 24 * 60 * 60, newRefreshToken);
+  }
+
+  console.log("New Nomba access token issued and cached successfully!");
+  return newAccessToken;
 };
 
 export interface VirtualAccountResult {
