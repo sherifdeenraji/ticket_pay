@@ -1,51 +1,26 @@
 services:
 
   # ── Reverse Proxy + SSL ─────────────────────────────────────────────────────
-  nginx:
-    image: nginx:alpine
-    container_name: ticketpay-nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./certbot/conf:/etc/letsencrypt:ro
-      - ./certbot/www:/var/www/certbot:ro
-    depends_on:
-      - frontend
-      - admin
-      - backend
-    restart: unless-stopped
-
-  # ── SSL Certificate Auto-Renewal ────────────────────────────────────────────
-  certbot:
-    image: certbot/certbot
-    container_name: ticketpay-certbot
-    volumes:
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
-    entrypoint: >
-      sh -c "trap exit TERM;
-             while :; do certbot renew --quiet; sleep 12h & wait $${!}; done"
-    restart: unless-stopped
-
   # ── Backend API ─────────────────────────────────────────────────────────────
   backend:
     image: ghcr.io/${GITHUB_REPOSITORY}/backend:${IMAGE_TAG:-latest}
     container_name: ticketpay-backend
     env_file: .env
+    ports:
+      - "127.0.0.1:5000:5000"
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
-    # Not exposed to host — only reachable via nginx on internal network
 
   # ── Student Frontend ─────────────────────────────────────────────────────────
   frontend:
     image: ghcr.io/${GITHUB_REPOSITORY}/frontend:${IMAGE_TAG:-latest}
     container_name: ticketpay-frontend
+    ports:
+      - "127.0.0.1:3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     restart: unless-stopped
@@ -54,6 +29,8 @@ services:
   admin:
     image: ghcr.io/${GITHUB_REPOSITORY}/admin:${IMAGE_TAG:-latest}
     container_name: ticketpay-admin
+    ports:
+      - "127.0.0.1:3001:3001"
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     restart: unless-stopped

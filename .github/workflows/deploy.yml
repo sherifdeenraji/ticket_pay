@@ -109,14 +109,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Copy docker-compose & nginx config to VPS
+      - name: Copy docker-compose config to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
-          source: "docker-compose.yml,nginx/,init.sql"
+          source: "docker-compose.yml,init.sql"
           target: "~/ticketpay"
 
       - name: Deploy via SSH
@@ -148,7 +148,6 @@ jobs:
             docker compose up -d --no-deps --remove-orphans backend
             docker compose up -d --no-deps --remove-orphans frontend
             docker compose up -d --no-deps --remove-orphans admin
-            docker compose up -d --no-deps nginx certbot
 
             # ── Cleanup dangling images ───────────────────────────────────────
             docker image prune -f
