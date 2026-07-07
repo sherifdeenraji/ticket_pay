@@ -13,6 +13,26 @@ function VerifyEmailForm() {
     const [status, setStatus] = useState<"loading" | "success" | "error">(() => token ? "loading" : "error")
     const [message, setMessage] = useState(() => token ? "Verifying your email address..." : "Invalid verification link. No token provided.")
 
+    const [email, setEmail] = useState("")
+    const [resendLoading, setResendLoading] = useState(false)
+    const [resendSuccess, setResendSuccess] = useState("")
+    const [resendError, setResendError] = useState("")
+
+    const handleResend = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setResendLoading(true)
+        setResendSuccess("")
+        setResendError("")
+        try {
+            await api.post("/auth/resend-verification", { email })
+            setResendSuccess("Verification email resent successfully! Check your inbox.")
+        } catch (err: any) {
+            setResendError(err.message || "Failed to resend verification email.")
+        } finally {
+            setResendLoading(false)
+        }
+    }
+
     useEffect(() => {
         if (!token) return
 
@@ -66,12 +86,53 @@ function VerifyEmailForm() {
                     )}
 
                     {status === "error" && (
-                        <div className="flex flex-col items-center justify-center py-6 space-y-4">
+                        <div className="flex flex-col items-center justify-center py-4 space-y-4">
                             <XCircle className="w-16 h-16 text-destructive" />
                             <h2 className="text-2xl font-bold text-destructive">Verification Failed</h2>
-                            <p className="text-slate-600 dark:text-slate-400 font-medium">{message}</p>
-                            <Link href="/login" className="w-full mt-6">
-                                <button className="w-full h-12 rounded-xl border border-border bg-background hover:bg-accent font-semibold transition-all">
+                            <p className="text-slate-600 dark:text-slate-400 text-sm font-medium mb-2">{message}</p>
+                            
+                            {/* Resend Verification Form */}
+                            <form onSubmit={handleResend} className="w-full text-left space-y-3 bg-secondary/35 border border-border/40 p-4 rounded-2xl">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                    Resend Verification Link
+                                </h3>
+                                
+                                {resendSuccess && (
+                                    <p className="text-xs text-green-600 font-semibold">{resendSuccess}</p>
+                                )}
+                                {resendError && (
+                                    <p className="text-xs text-destructive font-semibold">{resendError}</p>
+                                )}
+
+                                <div className="space-y-1.5">
+                                    <input
+                                        type="email"
+                                        placeholder="Enter your email address"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        required
+                                        disabled={resendLoading}
+                                        className="w-full h-10 px-3 text-sm rounded-xl border border-input bg-background/50 focus-visible:ring-1 focus-visible:ring-primary focus-visible:outline-none"
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={resendLoading}
+                                    className="w-full h-10 rounded-xl bg-primary text-white text-xs font-bold hover:opacity-90 transition-all flex items-center justify-center gap-1.5"
+                                >
+                                    {resendLoading ? (
+                                        <>
+                                            <Loader2 size={12} className="animate-spin" />
+                                            <span>Sending...</span>
+                                        </>
+                                    ) : (
+                                        <span>Resend Verification Email</span>
+                                    )}
+                                </button>
+                            </form>
+
+                            <Link href="/login" className="w-full mt-4">
+                                <button className="w-full h-11 rounded-xl border border-border bg-background hover:bg-accent text-xs font-bold transition-all">
                                     Back to Login
                                 </button>
                             </Link>

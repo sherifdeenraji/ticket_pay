@@ -23,12 +23,12 @@ export default function RegisterPage() {
         const firstname = formData.get("firstname")
         const lastname = formData.get("lastname")
         const email = formData.get("email")
-        const phone = formData.get("phone")
+        const phone_number = formData.get("phone")
         const password = formData.get("password")
 
         try {
-            await api.post("/auth/register", { firstname, lastname, email, phone, password })
-            router.push("/login?registered=true")
+            await api.post("/auth/register", { firstname, lastname, email, phone_number, password })
+            router.push("/register-success")
         } catch (err: any) {
             setError(err.message)
         } finally {

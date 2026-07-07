@@ -42,3 +42,9 @@ export const verifyEmailSchema = z.object({
         token: z.string().min(1, 'Verification token is required'),
     }),
 });
+
+export const resendVerificationSchema = z.object({
+    body: z.object({
+        email: z.string().email('Invalid email address'),
+    }),
+});

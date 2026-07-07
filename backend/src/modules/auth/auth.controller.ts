@@ -77,6 +77,14 @@ export const authController = {
                 return res.status(403).json({ success: false, message: 'Your account has been suspended' });
             }
 
+            if (!user.email_verified) {
+                return res.status(403).json({ 
+                    success: false, 
+                    message: 'Email not verified. Please verify your email before logging in.',
+                    unverified: true 
+                });
+            }
+
             const token = signToken(user.id);
 
             // Set cookie for httpOnly JWT
@@ -350,6 +358,40 @@ export const authController = {
             res.status(200).json({
                 success: true,
                 message: 'Email verified successfully',
+            });
+        } catch (error) {
+            next(error);
+        }
+    },
+    resendVerification: async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const { email } = req.body;
+            const user = await userService.findByEmail(email);
+            if (!user) {
+                return res.status(404).json({ success: false, message: 'User not found' });
+            }
+
+            if (user.email_verified) {
+                return res.status(400).json({ success: false, message: 'Email is already verified' });
+            }
+
+            const token = signToken(user.id);
+
+            try {
+                const verificationLink = `${config.FRONTEND.STUDENT}/auth/verify?token=${token}`;
+                await sendEmail(
+                    email,
+                    'Welcome to TicketPay - Verify Your Email',
+                    emailTemplates.accountVerification(user.fullname || `${user.firstname} ${user.lastname}`, verificationLink)
+                );
+            } catch (emailError) {
+                console.error('Failed to send verification email:', emailError);
+                return res.status(500).json({ success: false, message: 'Failed to resend verification email. Please try again later.' });
+            }
+
+            res.status(200).json({
+                success: true,
+                message: 'Verification email resent successfully.',
             });
         } catch (error) {
             next(error);

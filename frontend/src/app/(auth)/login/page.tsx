@@ -17,10 +17,13 @@ function LoginForm() {
     const [error, setError] = useState("")
     const [success, setSuccess] = useState("")
     const [showPassword, setShowPassword ] = useState(false)
+    const [showResend, setShowResend] = useState(false)
+    const [resendEmail, setResendEmail] = useState("")
+    const [resendLoading, setResendLoading] = useState(false)
 
     useEffect(() => {
         if (searchParams.get("registered")) {
-            setSuccess("Registration successful! Please log in.")
+            setSuccess("Registration successful! Please verify your email before logging in.")
         }
     }, [searchParams])
 
@@ -29,6 +32,7 @@ function LoginForm() {
         setIsLoading(true)
         setError("")
         setSuccess("")
+        setShowResend(false)
 
         const formData = new FormData(e.currentTarget)
         const email = formData.get("email")
@@ -40,8 +44,27 @@ function LoginForm() {
             router.push("/dashboard")
         } catch (err: any) {
             setError(err.message)
+            if (err.message && (err.message.includes("verified") || err.message.includes("verify"))) {
+                setShowResend(true)
+                setResendEmail(email as string)
+            }
         } finally {
             setIsLoading(false)
+        }
+    }
+
+    const handleResendOnLogin = async () => {
+        setResendLoading(true)
+        setError("")
+        setSuccess("")
+        try {
+            await api.post("/auth/resend-verification", { email: resendEmail })
+            setSuccess("Verification email resent successfully! Check your inbox.")
+            setShowResend(false)
+        } catch (err: any) {
+            setError(err.message || "Failed to resend verification email.")
+        } finally {
+            setResendLoading(false)
         }
     }
 
@@ -62,6 +85,19 @@ function LoginForm() {
                     {error && (
                         <div className="p-4 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-xl">
                             {error}
+                            {showResend && (
+                                <div className="mt-3 pt-3 border-t border-destructive/10 flex items-center justify-between text-xs font-semibold">
+                                    <span className="text-slate-600 dark:text-slate-400">Didn&apos;t receive the email?</span>
+                                    <button
+                                        type="button"
+                                        onClick={handleResendOnLogin}
+                                        disabled={resendLoading}
+                                        className="text-primary hover:underline font-bold"
+                                    >
+                                        {resendLoading ? "Sending..." : "Resend Link"}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                     {success && (
