@@ -43,37 +43,38 @@ export default function HistoryPage() {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const [walletRes, rideRes] = await Promise.all([
-          api.get("/wallet/transactions").catch(() => ({ data: { data: [] } })),
-          api.get("/payments/history").catch(() => ({ data: { data: [] } })),
-        ])
+        const walletRes = await api.get("/wallet/transactions").catch(() => ({ data: { data: [] } }));
 
-        const combined: Transaction[] = [
-          ...walletRes.data.data.map((t: any) => ({
+        const combined: Transaction[] = walletRes.data.data.map((t: any) => {
+          let driver_code = undefined;
+          if (t.type === "debit" && t.description) {
+            // Description format: "Ride payment: X ticket(s) to DRVXXX"
+            const match = t.description.match(/to\s+(\w+)/);
+            if (match) {
+              driver_code = match[1];
+            }
+          }
+          return {
             ...t,
-            kind: "wallet" as const,
-            type: "credit" as const,
-          })),
-          ...rideRes.data.data.map((t: any) => ({
-            ...t,
-            kind: "ride" as const,
-            type: "debit" as const,
-          })),
-        ].sort(
-          (a, b) =>
+            kind: t.type === "credit" ? ("wallet" as const) : ("ride" as const),
+            type: t.type as "credit" | "debit",
+            driver_code,
+          };
+        }).sort(
+          (a: Transaction, b: Transaction) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        )
+        );
 
-        setTransactions(combined)
+        setTransactions(combined);
       } catch (err) {
-        console.error("Failed to fetch history", err)
+        console.error("Failed to fetch history", err);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchHistory()
-  }, [])
+    fetchHistory();
+  }, []);
 
   const filteredTransactions = useMemo(() => {
     let result = [...transactions]
