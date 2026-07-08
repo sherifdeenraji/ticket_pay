@@ -64,13 +64,13 @@ export function DriverAuthProvider({ children }: { children: React.ReactNode }) 
         }
         try {
             const response = await api.get('/drivers/me/dashboard');
-            const data = response.data;
+            const resBody = response.data; // { success: true, data: { driver, today_payments, summary } }
 
-            if (data.success && data.driver) {
-                setDriver(data.driver);
+            if (resBody.success && resBody.data && resBody.data.driver) {
+                setDriver(resBody.data.driver);
                 setDashboardData({
-                    today_payments: data.today_payments ?? [],
-                    summary: data.summary ?? {},
+                    today_payments: resBody.data.today_payments ?? [],
+                    summary: resBody.data.summary ?? {},
                 });
             } else {
                 setDriver(null);
