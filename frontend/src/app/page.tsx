@@ -150,16 +150,18 @@ export default function LandingPage() {
                     </Link>
                 </div>
 
-                {/* Floating elements for visual interest */}
-                <div className="mt-12 sm:mt-24 w-full max-w-4xl glass rounded-2xl sm:rounded-[40px] p-2 overflow-hidden border-white/50 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)]">
-                    <div className="bg-slate-50 dark:bg-slate-900 rounded-xl sm:rounded-[34px] overflow-hidden aspect-video flex items-center justify-center">
-                        {/* Placeholder for an app preview image or illustration */}
-                        <div className="flex flex-col items-center text-muted-foreground opacity-50 px-4">
-                            <svg className="w-12 sm:w-20 h-12 sm:h-20 mb-2 sm:mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                            </svg>
-                            <span className="text-xs sm:text-lg font-medium tracking-wide text-center">Interactive Dashboard Preview</span>
-                        </div>
+                {/* Video Demonstration / How it Works */}
+                <div id="how-it-works" className="mt-12 sm:mt-24 w-full max-w-4xl glass rounded-2xl sm:rounded-[40px] p-2 overflow-hidden border-white/50 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)]">
+                    <div className="bg-slate-50 dark:bg-slate-900 rounded-xl sm:rounded-[34px] overflow-hidden aspect-video flex items-center justify-center relative">
+                        <video
+                            className="w-full h-full object-cover"
+                            controls
+                            playsInline
+                            preload="metadata"
+                            src="https://res.cloudinary.com/dkc3adbz0/video/upload/v1783771192/ticketpay_pitch_twcczu.mp4"
+                        >
+                            Your browser does not support the video tag.
+                        </video>
                     </div>
                 </div>
             </main>

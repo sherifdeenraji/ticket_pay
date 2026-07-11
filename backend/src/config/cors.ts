@@ -17,7 +17,7 @@ export const corsOptions: CorsOptions = {
             callback(null, true);
         } else {
             console.warn(`[CORS Blocked] Request from unauthorized origin: "${origin}". Allowed origins:`, allowedOrigins);
-            callback(new Error('Not allowed by CORS'));
+            callback(null, false);
         }
     },
     credentials: true,
